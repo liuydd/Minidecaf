@@ -16,9 +16,9 @@ MAX_INT: Final[int] = 0x7FFF_FFFF
 @unique
 class RvUnaryOp(Enum):
     NEG = auto()
+    NOT = auto() #BITNOT
+    SEQZ = auto() #LOGICNOT
     SNEZ = auto()
-    BITNOT = auto()
-    LOGICNOT = auto()
 
 @unique
 class RvBinaryOp(Enum):
@@ -116,7 +116,7 @@ class Riscv:
     class Unary(BackendInstr):
         def __init__(self, op: RvUnaryOp, dst: Temp, src: Temp) -> None:
             super().__init__(InstrKind.SEQ, [dst], [src], None)
-            self.op = op.__str__()[10:].lower()
+            self.op = op.__str__()[10:].lower() #这里是直接将其转换为小写，对于取负数来说直接成立，但是对于逻辑非和按位非来说就不成立了，除非换成对应的汇编符号
 
         def __str__(self) -> str:
             return "{} ".format(self.op) + Riscv.FMT2.format(

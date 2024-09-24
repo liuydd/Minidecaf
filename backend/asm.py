@@ -20,7 +20,7 @@ class Asm:
         for func in prog.funcs:
             emitter = RiscvAsmEmitter(Riscv.AllocatableRegs, Riscv.CallerSaved)
             reg_alloc = BruteRegAlloc(emitter)
-            pair = emitter.selectInstr(func)
+            pair = emitter.selectInstr(func) #指令选择将中端TAC代码转换为riscv汇编代码
             builder = CFGBuilder()
             cfg: CFG = builder.buildFrom(pair[0])
             analyzer.accept(cfg)

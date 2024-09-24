@@ -139,10 +139,10 @@ class TACGen(Visitor[TACFuncEmitter, None]):
     def transform(self, program: Program) -> TACProg:
         labelManager = LabelManager()
         tacFuncs = []
-        for funcName, astFunc in program.functions().items():
+        for funcName, astFunc in program.functions().items(): #遍历每个函数?
             # in step9, you need to use real parameter count
             emitter = TACFuncEmitter(FuncLabel(funcName), 0, labelManager)
-            astFunc.body.accept(self, emitter)
+            astFunc.body.accept(self, emitter) #调用不同的visit函数
             tacFuncs.append(emitter.visitEnd())
         return TACProg(tacFuncs)
 
@@ -222,6 +222,8 @@ class TACGen(Visitor[TACFuncEmitter, None]):
 
         op = {
             node.UnaryOp.Neg: tacop.TacUnaryOp.NEG,
+            node.UnaryOp.BitNot: tacop.TacUnaryOp.BITNOT,
+            node.UnaryOp.LogicNot: tacop.TacUnaryOp.LOGICNOT
             # You can add unary operations here.
         }[expr.op]
         expr.setattr("val", mv.visitUnary(op, expr.operand.getattr("val")))

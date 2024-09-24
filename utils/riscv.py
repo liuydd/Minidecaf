@@ -28,6 +28,14 @@ class RvBinaryOp(Enum):
     MUL = auto()
     DIV = auto()
     REM = auto() #MOD
+    SLT = auto()
+    SGT = auto()
+    SLE = auto() #<=
+    SGE = auto() #>=
+    SEQZ = auto() #==
+    BNE = auto() #!=
+    AND = auto()
+    LOR = auto()
 
 class Riscv:
 

@@ -6,6 +6,7 @@ from utils.riscv import Riscv, RvBinaryOp, RvUnaryOp
 from utils.tac.reg import Reg
 from utils.tac.tacfunc import TACFunc
 from utils.tac.tacinstr import *
+from utils.tac.tacinstr import Assign
 from utils.tac.tacvisitor import TACVisitor
 from utils.asmcodeprinter import AsmCodePrinter
 from utils.tac.backendinstr import BackendInstr
@@ -57,6 +58,11 @@ class RiscvAsmEmitter():
 
         def visitOther(self, instr: TACInstr) -> None:
             raise NotImplementedError("RiscvInstrSelector visit{} not implemented".format(type(instr).__name__))
+
+        def visitAssign(self, instr: Assign) -> None:
+            # print("here")
+            self.seq.append(Riscv.Move(instr.dst, instr.src))
+            
 
         # in step11, you need to think about how to deal with globalTemp in almost all the visit functions. 
         def visitReturn(self, instr: Return) -> None:
@@ -115,6 +121,7 @@ class RiscvAsmEmitter():
                     TacBinaryOp.MOD: RvBinaryOp.REM,
                     TacBinaryOp.SLT: RvBinaryOp.SLT,
                     TacBinaryOp.SGT: RvBinaryOp.SGT,
+                    # TacBinaryOp.ASSIGN: RvBinaryOp.MV,
                     # You can add binary operations here.
                 }[instr.op]
                 self.seq.append(Riscv.Binary(op, instr.dst, instr.lhs, instr.rhs))

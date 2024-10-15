@@ -36,6 +36,7 @@ class RvBinaryOp(Enum):
     BNE = auto() #!=
     AND = auto()
     LOR = auto()
+    # MV = auto() #=s
 
 class Riscv:
 

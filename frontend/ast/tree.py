@@ -208,16 +208,16 @@ class Block(Statement, ListNode[Union["Statement", "Declaration"]]):
         return True
 
 
-class Declaration(Node):
+class Declaration(Node): #变量声明
     """
     AST node of declaration.
     """
 
     def __init__(
         self,
-        var_t: TypeLiteral,
-        ident: Identifier,
-        init_expr: Optional[Expression] = None,
+        var_t: TypeLiteral, #类型
+        ident: Identifier, #标识符
+        init_expr: Optional[Expression] = None, #初始表达式
     ) -> None:
         super().__init__("declaration")
         self.var_t = var_t
@@ -300,7 +300,7 @@ class Binary(Expression):
         )
 
 
-class Assignment(Binary):
+class Assignment(Binary): #赋值运算
     """
     AST node of assignment expression.
     It's actually a kind of binary expression, but it'll make things easier if we use another accept method to handle it.
@@ -345,7 +345,7 @@ class ConditionExpression(Expression):
         )
 
 
-class Identifier(Expression):
+class Identifier(Expression): #标识符
     """
     AST node of identifier "expression".
     """
@@ -411,7 +411,7 @@ class TypeLiteral(Node):
         return True
 
 
-class TInt(TypeLiteral):
+class TInt(TypeLiteral): #整型
     "AST node of type `int`."
 
     def __init__(self) -> None:

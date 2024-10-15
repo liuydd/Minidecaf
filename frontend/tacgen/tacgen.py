@@ -161,7 +161,10 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         """
         1. Set the 'val' attribute of ident as the temp variable of the 'symbol' attribute of ident.
         """
-        raise NotImplementedError
+        symbol = ident.getattr("symbol")
+        ident.setattr("val", symbol.temp)
+        # print("symbol.temp:", symbol.temp)
+        # raise NotImplementedError
 
     def visitDeclaration(self, decl: Declaration, mv: TACFuncEmitter) -> None:
         """
@@ -169,7 +172,21 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         2. Use mv.freshTemp to get a new temp variable for this symbol.
         3. If the declaration has an initial value, use mv.visitAssignment to set it.
         """
-        raise NotImplementedError
+        symbol = decl.getattr("symbol")
+        new_temp = mv.freshTemp()
+        symbol.temp = new_temp
+        if decl.init_expr is not None:
+            # print("new_temp:", new_temp)
+            # print("init_temp:", init_temp)
+            # print(decl.init_expr)
+            # print(type(decl.init_expr))
+            if type(decl.init_expr) == IntLiteral:
+                init_temp = mv.visitLoad(decl.init_expr.value)
+                mv.visitAssignment(new_temp, init_temp)
+            else:
+                init_temp = decl.init_expr.accept(self, mv)
+                mv.visitAssignment(new_temp, decl.init_expr.getattr("val")) #?
+        # raise NotImplementedError
 
     def visitAssignment(self, expr: Assignment, mv: TACFuncEmitter) -> None:
         """
@@ -177,7 +194,12 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         2. Use mv.visitAssignment to emit an assignment instruction.
         3. Set the 'val' attribute of expr as the value of assignment instruction.
         """
-        raise NotImplementedError
+        rhs_temp = expr.rhs.accept(self, mv)
+        lhs_symbol = expr.lhs.getattr("val")
+        # print(lhs_symbol)
+        mv.visitAssignment(lhs_symbol, rhs_temp)
+        expr.setattr("val", rhs_temp)
+        # raise NotImplementedError
 
     def visitIf(self, stmt: If, mv: TACFuncEmitter) -> None:
         stmt.cond.accept(self, mv)

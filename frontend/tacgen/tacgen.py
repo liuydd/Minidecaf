@@ -1,4 +1,4 @@
-from frontend.ast.node import Optional
+from frontend.ast.node import Optional, NullType
 from frontend.ast.tree import Function, Optional
 from frontend.ast import node
 from frontend.ast.tree import *
@@ -175,17 +175,21 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         symbol = decl.getattr("symbol")
         new_temp = mv.freshTemp()
         symbol.temp = new_temp
-        if decl.init_expr is not None:
+        if decl.init_expr is not NULL:
             # print("new_temp:", new_temp)
-            # print("init_temp:", init_temp)
             # print(decl.init_expr)
             # print(type(decl.init_expr))
-            if type(decl.init_expr) == IntLiteral:
-                init_temp = mv.visitLoad(decl.init_expr.value)
-                mv.visitAssignment(new_temp, init_temp)
-            else:
-                init_temp = decl.init_expr.accept(self, mv)
-                mv.visitAssignment(new_temp, decl.init_expr.getattr("val")) #?
+            # print(decl)
+            # if type(decl.init_expr) == IntLiteral:
+            #     init_temp = mv.visitLoad(decl.init_expr.value)
+            #     mv.visitAssignment(new_temp, init_temp)
+            # elif type(decl.init_expr) == NullType:
+            #     init_temp = mv.visitLoad(0)
+            #     mv.visitAssignment(new_temp, init_temp)
+            # else:
+            init_temp = decl.init_expr.accept(self, mv)
+            mv.visitAssignment(new_temp, decl.init_expr.getattr("val")) #?
+            
         # raise NotImplementedError
 
     def visitAssignment(self, expr: Assignment, mv: TACFuncEmitter) -> None:
@@ -194,10 +198,13 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         2. Use mv.visitAssignment to emit an assignment instruction.
         3. Set the 'val' attribute of expr as the value of assignment instruction.
         """
-        rhs_temp = expr.rhs.accept(self, mv)
-        lhs_symbol = expr.lhs.getattr("val")
+        expr.rhs.accept(self, mv)
+        # breakpoint()
+        lhs_symbol = expr.lhs.getattr("symbol").temp
         # print(lhs_symbol)
-        mv.visitAssignment(lhs_symbol, rhs_temp)
+        rhs_symbol = expr.rhs.getattr("val")
+        # print(lhs_symbol)
+        rhs_temp = mv.visitAssignment(lhs_symbol, rhs_symbol)
         expr.setattr("val", rhs_temp)
         # raise NotImplementedError
 
@@ -268,6 +275,7 @@ class TACGen(Visitor[TACFuncEmitter, None]):
             node.BinaryOp.EQ: tacop.TacBinaryOp.EQU,
             node.BinaryOp.NE: tacop.TacBinaryOp.NEQ,
             node.BinaryOp.LogicAnd: tacop.TacBinaryOp.AND,
+            node.BinaryOp.Assign: tacop.TacBinaryOp.ASSIGN,
             # You can add binary operations here.
         }[expr.op]
         expr.setattr(

@@ -40,7 +40,8 @@ class TacBinaryOp(Enum):
     NEQ = auto()
     OR = auto()
     AND = auto()
-
+    ASSIGN = auto()
+    
 # Kinds of branching with conditions.
 @unique
 class CondBranchOp(Enum):

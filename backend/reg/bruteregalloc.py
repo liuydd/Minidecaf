@@ -36,9 +36,11 @@ class BruteRegAlloc(RegAlloc):
 
     def accept(self, graph: CFG, info: SubroutineInfo) -> None:
         subEmitter = RiscvSubroutineEmitter(self.emitter, info)
+        available_block = graph.findAvailableBlock()
         for bb in graph.iterator():
             # you need to think more here
             # maybe we don't need to alloc regs for all the basic blocks
+            if bb.id not in available_block: continue
             if bb.label is not None:
                 subEmitter.emitLabel(bb.label)
             self.localAlloc(bb, subEmitter)

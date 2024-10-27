@@ -5,6 +5,7 @@ from frontend.ast.tree import *
 from frontend.ast.visitor import RecursiveVisitor, Visitor
 from frontend.scope.globalscope import GlobalScope
 from frontend.scope.scope import Scope, ScopeKind
+from frontend.scope.scopestack import ScopeStack
 from frontend.symbol.funcsymbol import FuncSymbol
 from frontend.symbol.symbol import Symbol
 from frontend.symbol.varsymbol import VarSymbol
@@ -19,7 +20,7 @@ syntax tree and store them in symbol tables (i.e. scopes).
 """
 
 
-class Namer(Visitor[Scope, None]):
+class Namer(Visitor[ScopeStack, None]):
     def __init__(self) -> None:
         pass
 
@@ -27,12 +28,12 @@ class Namer(Visitor[Scope, None]):
     def transform(self, program: Program) -> Program:
         # Global scope. You don't have to consider it until Step 6.
         program.globalScope = GlobalScope
-        ctx = Scope(program.globalScope)
+        ctx = ScopeStack(program.globalScope)
 
         program.accept(self, ctx)
         return program
 
-    def visitProgram(self, program: Program, ctx: Scope) -> None:
+    def visitProgram(self, program: Program, ctx: ScopeStack) -> None:
         # Check if the 'main' function is missing
         if not program.hasMainFunc():
             raise DecafNoMainFuncError
@@ -40,14 +41,27 @@ class Namer(Visitor[Scope, None]):
         for func in program.functions().values():
             func.accept(self, ctx)
 
-    def visitFunction(self, func: Function, ctx: Scope) -> None:
-        func.body.accept(self, ctx)
+    def visitFunction(self, func: Function, ctx: ScopeStack) -> None:
+        # func.body.accept(self, ctx)
+        if ctx.isConflict(func.ident.value):
+            raise DecafDeclConflictError
+        else:
+            newSymbol = FuncSymbol(func.ident.value, func.ret_t.type, ctx.currentScope())
+            ctx.declare(newSymbol)
+            func.body.accept(self, ctx)
+            
+            
 
-    def visitBlock(self, block: Block, ctx: Scope) -> None:
+    def visitBlock(self, block: Block, ctx: ScopeStack) -> None:
+        # for child in block:
+        #     child.accept(self, ctx)
+        block_scope = Scope(ScopeKind.LOCAL)
+        ctx.addScope(block_scope)
         for child in block:
             child.accept(self, ctx)
+        ctx.popScope()
 
-    def visitReturn(self, stmt: Return, ctx: Scope) -> None:
+    def visitReturn(self, stmt: Return, ctx: ScopeStack) -> None:
         stmt.expr.accept(self, ctx)
 
     """
@@ -60,7 +74,7 @@ class Namer(Visitor[Scope, None]):
     5. Close the loop and the local scope.
     """
 
-    def visitIf(self, stmt: If, ctx: Scope) -> None:
+    def visitIf(self, stmt: If, ctx: ScopeStack) -> None:
         stmt.cond.accept(self, ctx)
         stmt.then.accept(self, ctx)
 
@@ -68,11 +82,11 @@ class Namer(Visitor[Scope, None]):
         if not stmt.otherwise is NULL:
             stmt.otherwise.accept(self, ctx)
 
-    def visitWhile(self, stmt: While, ctx: Scope) -> None:
+    def visitWhile(self, stmt: While, ctx: ScopeStack) -> None:
         stmt.cond.accept(self, ctx)
         stmt.body.accept(self, ctx)
 
-    def visitBreak(self, stmt: Break, ctx: Scope) -> None:
+    def visitBreak(self, stmt: Break, ctx: ScopeStack) -> None:
         """
         You need to check if it is currently within the loop.
         To do this, you may need to check 'visitWhile'.
@@ -88,27 +102,29 @@ class Namer(Visitor[Scope, None]):
     1. Refer to the implementation of visitBreak.
     """
 
-    def visitDeclaration(self, decl: Declaration, ctx: Scope) -> None:
+    def visitDeclaration(self, decl: Declaration, ctx: ScopeStack) -> None:
         """
         1. Use ctx.lookup to find if a variable with the same name has been declared.
         2. If not, build a new VarSymbol, and put it into the current scope using ctx.declare.
         3. Set the 'symbol' attribute of decl.
         4. If there is an initial value, visit it.
         """
-        if ctx.lookup(decl.ident.value) is not None: raise DecafUndefinedVarError(f"Variable {decl.ident.value} already declared")
-        new_symbol = VarSymbol(decl.ident.value, decl.var_t)
-        ctx.declare(new_symbol)
-        # print(ctx.symbols)
-        # print("decl:", decl)
-        # print("decl.indent:", decl.ident)
-        decl.setattr("symbol", new_symbol)
-        # print(decl.ident.getattr("symbol"))
-        if decl.init_expr is not None:
-            # print("decl.init_expr:", decl.init_expr)
-            decl.init_expr.accept(self, ctx)
-        # raise NotImplementedError
+        if ctx.isConflict(decl.ident.value): raise DecafUndefinedVarError(f"Variable {decl.ident.value} already declared")
+        # if ctx.lookup(decl.ident.value) is not None: raise DecafUndefinedVarError(f"Variable {decl.ident.value} already declared")
+        else:
+            new_symbol = VarSymbol(decl.ident.value, decl.var_t)
+            ctx.declare(new_symbol)
+            # print(ctx.symbols)
+            # print("decl:", decl)
+            # print("decl.indent:", decl.ident)
+            decl.setattr("symbol", new_symbol)
+            # print(decl.ident.getattr("symbol"))
+            if decl.init_expr is not None:
+                # print("decl.init_expr:", decl.init_expr)
+                decl.init_expr.accept(self, ctx)
+            # raise NotImplementedError
 
-    def visitAssignment(self, expr: Assignment, ctx: Scope) -> None:
+    def visitAssignment(self, expr: Assignment, ctx: ScopeStack) -> None:
         """
         1. Refer to the implementation of visitBinary.
         """
@@ -117,20 +133,20 @@ class Namer(Visitor[Scope, None]):
         # raise NotImplementedError
 
 
-    def visitUnary(self, expr: Unary, ctx: Scope) -> None:
+    def visitUnary(self, expr: Unary, ctx: ScopeStack) -> None:
         expr.operand.accept(self, ctx)
 
-    def visitBinary(self, expr: Binary, ctx: Scope) -> None:
+    def visitBinary(self, expr: Binary, ctx: ScopeStack) -> None:
         expr.lhs.accept(self, ctx)
         expr.rhs.accept(self, ctx)
 
-    def visitCondExpr(self, expr: ConditionExpression, ctx: Scope) -> None:
+    def visitCondExpr(self, expr: ConditionExpression, ctx: ScopeStack) -> None:
         """
         1. Refer to the implementation of visitBinary.
         """
         raise NotImplementedError
 
-    def visitIdentifier(self, ident: Identifier, ctx: Scope) -> None:
+    def visitIdentifier(self, ident: Identifier, ctx: ScopeStack) -> None:
         """
         1. Use ctx.lookup to find the symbol corresponding to ident.
         2. If it has not been declared, raise a DecafUndefinedVarError.
@@ -142,7 +158,7 @@ class Namer(Visitor[Scope, None]):
         ident.setattr("symbol", symbol)
         # raise NotImplementedError
 
-    def visitIntLiteral(self, expr: IntLiteral, ctx: Scope) -> None:
+    def visitIntLiteral(self, expr: IntLiteral, ctx: ScopeStack) -> None:
         value = expr.value
         if value > MAX_INT:
             raise DecafBadIntValueError(value)

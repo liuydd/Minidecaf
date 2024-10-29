@@ -1,5 +1,5 @@
 from frontend.ast.node import Optional, NullType
-from frontend.ast.tree import Function, Optional
+from frontend.ast.tree import Continue, Function, Optional
 from frontend.ast import node
 from frontend.ast.tree import *
 from frontend.ast.visitor import Visitor
@@ -156,6 +156,9 @@ class TACGen(Visitor[TACFuncEmitter, None]):
 
     def visitBreak(self, stmt: Break, mv: TACFuncEmitter) -> None:
         mv.visitBranch(mv.getBreakLabel())
+        
+    def visitContinue(self, stmt: Continue, mv: TACFuncEmitter) -> None:
+        mv.visitBranch(mv.getContinueLabel())
 
     def visitIdentifier(self, ident: Identifier, mv: TACFuncEmitter) -> None:
         """
@@ -211,7 +214,7 @@ class TACGen(Visitor[TACFuncEmitter, None]):
     def visitIf(self, stmt: If, mv: TACFuncEmitter) -> None:
         stmt.cond.accept(self, mv)
 
-        if stmt.otherwise is NULL:
+        if stmt.otherwise is NULL: #没有else分支
             skipLabel = mv.freshLabel()
             mv.visitCondBranch(
                 tacop.CondBranchOp.BEQ, stmt.cond.getattr("val"), skipLabel
@@ -245,6 +248,27 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         mv.visitBranch(beginLabel)
         mv.visitLabel(breakLabel)
         mv.closeLoop()
+
+    def visitFor(self, stmt: For, mv: TACFuncEmitter) -> None:
+        beginLabel = mv.freshLabel()
+        loopLabel = mv.freshLabel()
+        breakLabel = mv.freshLabel()
+        mv.openLoop(breakLabel, loopLabel)
+        
+        stmt.init.accept(self, mv)
+        mv.visitLabel(beginLabel)
+        stmt.cond.accept(self, mv)
+        mv.visitCondBranch(tacop.CondBranchOp.BEQ, stmt.cond.getattr("val"), breakLabel)
+        stmt.body.accept(self, mv)
+        
+        mv.visitLabel(loopLabel)
+        stmt.update.accept(self, mv)
+        
+        mv.visitBranch(beginLabel)
+        mv.visitLabel(breakLabel)
+        mv.closeLoop()
+        
+        
 
     def visitUnary(self, expr: Unary, mv: TACFuncEmitter) -> None:
         expr.operand.accept(self, mv)
@@ -286,7 +310,22 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         """
         1. Refer to the implementation of visitIf and visitBinary.
         """
-        raise NotImplementedError
+        expr.cond.accept(self, mv)
+        temp = mv.freshTemp()
+        skipLabel = mv.freshLabel()
+        exitLabel = mv.freshLabel()
+        mv.visitCondBranch(
+            tacop.CondBranchOp.BEQ, expr.cond.getattr("val"), skipLabel
+        )
+        expr.then.accept(self, mv)
+        mv.visitAssignment(temp, expr.then.getattr("val"))
+        mv.visitBranch(exitLabel) #jump
+        mv.visitLabel(skipLabel)
+        expr.otherwise.accept(self, mv)
+        mv.visitAssignment(temp, expr.otherwise.getattr("val"))
+        mv.visitLabel(exitLabel)
+        expr.setattr("val", temp)
+        # raise NotImplementedError
 
     def visitIntLiteral(self, expr: IntLiteral, mv: TACFuncEmitter) -> None:
         expr.setattr("val", mv.visitLoad(expr.value))

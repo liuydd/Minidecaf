@@ -73,6 +73,16 @@ class Namer(Visitor[ScopeStack, None]):
     4. Visit body of the loop.
     5. Close the loop and the local scope.
     """
+    def visitFor(self, stmt: For, ctx: ScopeStack) -> None:
+        for_scope = Scope(ScopeKind.LOCAL)
+        ctx.addScope(for_scope)
+        if not stmt.init is NULL: stmt.init.accept(self, ctx)
+        if not stmt.cond is NULL: stmt.cond.accept(self, ctx)
+        if not stmt.update is NULL: stmt.update.accept(self, ctx)
+        ctx.openLoop()
+        stmt.body.accept(self, ctx)
+        ctx.closeLoop()
+        ctx.popScope()
 
     def visitIf(self, stmt: If, ctx: ScopeStack) -> None:
         stmt.cond.accept(self, ctx)
@@ -84,7 +94,9 @@ class Namer(Visitor[ScopeStack, None]):
 
     def visitWhile(self, stmt: While, ctx: ScopeStack) -> None:
         stmt.cond.accept(self, ctx)
+        ctx.openLoop()
         stmt.body.accept(self, ctx)
+        ctx.closeLoop()
 
     def visitBreak(self, stmt: Break, ctx: ScopeStack) -> None:
         """
@@ -94,13 +106,18 @@ class Namer(Visitor[ScopeStack, None]):
         if not in a loop:
             raise DecafBreakOutsideLoopError()
         """
-        raise NotImplementedError
+        if not ctx.inLoop():
+            raise DecafBreakOutsideLoopError()
+        # raise NotImplementedError
 
     """
     def visitContinue(self, stmt: Continue, ctx: Scope) -> None:
     
     1. Refer to the implementation of visitBreak.
     """
+    def visitContinue(self, stmt: Continue, ctx: ScopeStack) -> None:
+        if not ctx.inLoop():
+            raise DecafBreakOutsideLoopError()
 
     def visitDeclaration(self, decl: Declaration, ctx: ScopeStack) -> None:
         """
@@ -144,7 +161,10 @@ class Namer(Visitor[ScopeStack, None]):
         """
         1. Refer to the implementation of visitBinary.
         """
-        raise NotImplementedError
+        expr.cond.accept(self, ctx)
+        expr.then.accept(self, ctx)
+        expr.otherwise.accept(self, ctx)
+        # raise NotImplementedError
 
     def visitIdentifier(self, ident: Identifier, ctx: ScopeStack) -> None:
         """

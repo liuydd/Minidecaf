@@ -48,8 +48,7 @@ class CFG:
 
     def findAvailableBlock(self):
         available_block_id_list = [0]
-        v = 0
         for block in self.iterator():
-            if v in self.links[block.id][1]:
+            for v in self.links[block.id][1]:
                 available_block_id_list.append(v)
         return available_block_id_list

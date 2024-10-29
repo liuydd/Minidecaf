@@ -89,7 +89,7 @@ class Riscv:
     FMT_OFFSET = "{}, {}({})"
     # Todo FMT4
 
-    class JumpToEpilogue(BackendInstr):
+    class JumpToEpilogue(BackendInstr): #跳转指令
         def __init__(self, label: Label) -> None:
             super().__init__(
                 InstrKind.RET,
@@ -146,7 +146,7 @@ class Riscv:
                 str(self.dsts[0]), str(self.srcs[0]), str(self.srcs[1])
             )
     
-    class Branch(BackendInstr):
+    class Branch(BackendInstr): #条件跳转指令
         def __init__(self, cond: Temp, target: Label) -> None:
             super().__init__(InstrKind.COND_JMP, [], [cond], target)
             self.target = target
@@ -154,7 +154,7 @@ class Riscv:
         def __str__(self) -> str:
             return "beq " + Riscv.FMT3.format(str(Riscv.ZERO), str(self.srcs[0]), str(self.target))
 
-    class Jump(BackendInstr):
+    class Jump(BackendInstr): #跳转指令
         def __init__(self, target: Label) -> None:
             super().__init__(InstrKind.JMP, [], [], target)
             self.target = target

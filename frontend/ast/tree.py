@@ -76,25 +76,89 @@ class Function(Node):
         ret_t: TypeLiteral,
         ident: Identifier,
         body: Block,
+        params: Parameter = None,
     ) -> None:
         super().__init__("function")
         self.ret_t = ret_t
         self.ident = ident
         self.body = body
+        self.params = params
 
     def __getitem__(self, key: int) -> Node:
-        return (
-            self.ret_t,
-            self.ident,
-            self.body,
-        )[key]
+        if self.params == None:
+            return (
+                self.ret_t,
+                self.ident,
+                self.body,
+            )[key]
+        else:
+            return (
+                self.ret_t,
+                self.ident,
+                self.body,
+                self.params,
+            )[key]
 
     def __len__(self) -> int:
-        return 3
+        if self.params == None:
+            return 3
+        else:
+            return 4
 
     def accept(self, v: Visitor[T, U], ctx: T):
         return v.visitFunction(self, ctx)
 
+# class Parameter(Node):
+#     """
+#     function parameters
+#     """
+    
+#     def __init__(
+#         self, 
+#         var_t: TypeLiteral,
+#         ident: Identifier,
+#     ) -> None:
+#         super().__init__("parameter")
+#         self.var_t = var_t
+#         self.ident = ident
+    
+#     def accept(self, v: Visitor[T, U], ctx: T):
+#         return v.visitParameter(self, ctx)
+    
+class Parameter(ListNode["Declaration"]):
+    """
+    parameter_list
+    """
+    def __init__(self, *children: Union[Declaration]) -> None:
+        super().__init__("parameter", list(children))
+        
+    def accept(self, v: Visitor[T, Any], ctx: T):
+        return v.visitParameter(self, ctx)
+    
+class Postfix(Node):
+    """
+    AST node of postfix (call function)
+    """
+    def __init__(
+        self,
+        ident: Identifier,
+        exprlist: ExpressionList,
+    ) -> None:
+        super().__init__("postfix")
+        self.ident = ident
+        self.exprlist = exprlist
+        
+    def __getitem__(self, key: int) -> Node:
+        return (
+            self.ident,
+            self.exprlist
+        )[key]
+        
+    def __len__(self) -> int:
+        return 2
+        
+    def accept(self, v: Visitor[T, U], ctx: T) -> U:
+        return v.visitPostfix(self, ctx)
 
 class Statement(Node):
     """
@@ -240,8 +304,8 @@ class Block(Statement, ListNode[Union["Statement", "Declaration"]]):
     def __init__(self, *children: Union[Statement, Declaration]) -> None:
         super().__init__("block", list(children))
 
-    def accept(self, v: Visitor[T, U], ctx: T):
-        return v.visitBlock(self, ctx)
+    def accept(self, v: Visitor[T, U], ctx: T, params: Parameter = None):
+        return v.visitBlock(self, ctx, params)
 
     def is_block(self) -> bool:
         return True
@@ -282,6 +346,15 @@ class Expression(Node):
         super().__init__(name)
         self.type: Optional[DecafType] = None
 
+class ExpressionList(ListNode["Expression"]):
+    """
+    expression_list
+    """
+    def __init__(self, *children: Union[Expression]) -> None:
+        super().__init__("expressionlist", list(children))
+        
+    def accept(self, v: Visitor[T, Any], ctx: T):
+        return v.visitExpressionList(self, ctx)
 
 class Unary(Expression):
     """

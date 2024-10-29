@@ -108,32 +108,40 @@ class Function(Node):
     def accept(self, v: Visitor[T, U], ctx: T):
         return v.visitFunction(self, ctx)
 
-# class Parameter(Node):
-#     """
-#     function parameters
-#     """
+class Parameter(Node):
+    """
+    function parameter
+    """
     
-#     def __init__(
-#         self, 
-#         var_t: TypeLiteral,
-#         ident: Identifier,
-#     ) -> None:
-#         super().__init__("parameter")
-#         self.var_t = var_t
-#         self.ident = ident
+    def __init__(
+        self, 
+        var_t: TypeLiteral,
+        ident: Identifier,
+    ) -> None:
+        super().__init__("parameter")
+        self.var_t = var_t
+        self.ident = ident
     
-#     def accept(self, v: Visitor[T, U], ctx: T):
-#         return v.visitParameter(self, ctx)
+    def __getitem__(self, key: int) -> Node:
+        return(
+            self.var_t, self.ident
+        )[key]
+        
+    def __len__(self) -> int:
+        return 2
     
-class Parameter(ListNode["Declaration"]):
+    def accept(self, v: Visitor[T, U], ctx: T):
+        return v.visitParameter(self, ctx)
+    
+class ParameterList(ListNode["Parameter"]):
     """
     parameter_list
     """
-    def __init__(self, *children: Union[Declaration]) -> None:
-        super().__init__("parameter", list(children))
+    def __init__(self, *children: Parameter) -> None:
+        super().__init__("parameter_list", list(children))
         
     def accept(self, v: Visitor[T, Any], ctx: T):
-        return v.visitParameter(self, ctx)
+        return v.visitParameterList(self, ctx)
     
 class Postfix(Node):
     """

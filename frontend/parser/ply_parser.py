@@ -74,7 +74,7 @@ def p_function_params_def(p):
     """
     p[0] = Function(p[1], p[2], p[7], p[4])
 
-def p_parameter(p):
+def p_parameter_list(p):
     """
     parameter : parameter params
     """
@@ -82,11 +82,11 @@ def p_parameter(p):
         p[1].children.append(p[2])
     p[0] = p[1]
     
-def p_parameter_empty(p):
+def p_parameter_list_empty(p):
     """
     parameter : empty
     """
-    p[0] = Parameter()
+    p[0] = ParameterList()
     
 def p_params_1(p):
     """

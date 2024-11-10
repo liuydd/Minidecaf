@@ -13,6 +13,7 @@ from utils import T, U
 
 from .node import NULL, BinaryOp, Node, UnaryOp
 from .visitor import Visitor, accept
+from utils.error import *
 
 _T = TypeVar("_T", bound=Node)
 U = TypeVar("U", covariant=True)
@@ -45,16 +46,27 @@ class ListNode(Node, Generic[_T]):
         return None if ret.count(None) == len(ret) else ret
 
 
-class Program(ListNode["Function"]):
+class Program(ListNode[Union["Function", "Declaration"]]):
     """
     AST root. It should have only one children before step9.
     """
 
-    def __init__(self, *children: Function) -> None:
+    def __init__(self, *children: Union[Function, Declaration]) -> None:
         super().__init__("program", list(children))
 
     def functions(self) -> dict[str, Function]:
-        return {func.ident.value: func for func in self if isinstance(func, Function)}
+        f = {}
+        for func in self:
+            if isinstance(func, Function):
+                if func.ident.value in f:
+                    raise DecafDeclConflictError(func.ident.value)
+                else:
+                    f[func.ident.value] = func
+        return f
+        # return {func.ident.value: func for func in self if isinstance(func, Function)}
+    
+    def globalVars(self) -> dict[str, int]:
+        return {decl.ident.value: decl for decl in self if isinstance(decl, Declaration)}
 
     def hasMainFunc(self) -> bool:
         return "main" in self.functions()
@@ -76,7 +88,7 @@ class Function(Node):
         ret_t: TypeLiteral,
         ident: Identifier,
         body: Block,
-        params: Parameter = None,
+        params: ParameterList,
     ) -> None:
         super().__init__("function")
         self.ret_t = ret_t
@@ -312,8 +324,8 @@ class Block(Statement, ListNode[Union["Statement", "Declaration"]]):
     def __init__(self, *children: Union[Statement, Declaration]) -> None:
         super().__init__("block", list(children))
 
-    def accept(self, v: Visitor[T, U], ctx: T, params: Parameter = None):
-        return v.visitBlock(self, ctx, params)
+    def accept(self, v: Visitor[T, U], ctx: T):
+        return v.visitBlock(self, ctx)
 
     def is_block(self) -> bool:
         return True

@@ -41,10 +41,17 @@ def p_empty(p: yacc.YaccProduction):
 
 def p_program(p):
     """
-    program : program function
+    program : program element
     """
     if p[2] is not NULL:
         p[1].children.append(p[2])
+    p[0] = p[1]
+
+def p_element(p):
+    """
+    element : declaration Semi
+            | function
+    """
     p[0] = p[1]
     
     
@@ -62,11 +69,11 @@ def p_type(p):
     p[0] = TInt()
 
 
-def p_function_def(p):
-    """
-    function : type Identifier LParen RParen LBrace block RBrace
-    """
-    p[0] = Function(p[1], p[2], p[6])
+# def p_function_def(p):
+#     """
+#     function : type Identifier LParen RParen LBrace block RBrace
+#     """
+#     p[0] = Function(p[1], p[2], p[6])
 
 def p_function_params_def(p):
     """

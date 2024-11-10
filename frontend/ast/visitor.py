@@ -33,6 +33,19 @@ class Visitor(Protocol[T, U]):  # type: ignore
 
     def visitFunction(self, that: Function, ctx: T) -> Optional[U]:
         return self.visitOther(that, ctx)
+    
+    def visitParameter(self, that: Parameter, ctx: T) -> Optional[U]:
+        return self.visitOther(that, ctx)
+    
+    def visitParameterList(self, that: ParameterList, ctx: T) -> Optional[Sequence[Optional[U]]]:
+        return self.visitOther(that, ctx)
+    
+    def visitExpressionList(self, that: ExpressionList, ctx: T) -> Optional[Sequence[Optional[U]]]:
+        return self.visitOther(that. ctx)
+    
+    def visitPostfix(self, that: Postfix, ctx: T) -> Optional[U]:
+        return self.visitOther(that, ctx)
+    
 
     def visitIf(self, that: If, ctx: T) -> Optional[U]:
         return self.visitOther(that, ctx)

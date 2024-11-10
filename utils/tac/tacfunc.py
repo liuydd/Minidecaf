@@ -1,5 +1,6 @@
 from utils.label.funclabel import FuncLabel
-
+from frontend.symbol.varsymbol import VarSymbol
+from typing import List, Dict
 from .tacinstr import TACInstr
 
 

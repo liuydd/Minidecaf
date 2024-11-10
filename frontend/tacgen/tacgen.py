@@ -1,5 +1,5 @@
 from frontend.ast.node import Optional, NullType
-from frontend.ast.tree import Continue, Function, Optional
+from frontend.ast.tree import Continue, Function, Optional, Parameter, Postfix
 from frontend.ast import node
 from frontend.ast.tree import *
 from frontend.ast.visitor import Visitor
@@ -70,6 +70,14 @@ class TACFuncEmitter(TACVisitor):
         self.func.add(Assign(dst, src))
         return src
 
+    def visitParam(self, value: Temp) -> None:
+        self.func.add(Param(value))
+        
+    def visitCall(self, label: Label) -> Temp:
+        temp = self.freshTemp()
+        self.func.add(Call(temp, label))
+        return temp
+
     def visitLoad(self, value: Union[int, str]) -> Temp:
         temp = self.freshTemp()
         self.func.add(LoadImm4(temp, value))
@@ -139,16 +147,31 @@ class TACGen(Visitor[TACFuncEmitter, None]):
     def transform(self, program: Program) -> TACProg:
         labelManager = LabelManager()
         tacFuncs = []
+        tacGlobalVars = program.globalVars()
         for funcName, astFunc in program.functions().items(): #遍历每个函数?
             # in step9, you need to use real parameter count
-            emitter = TACFuncEmitter(FuncLabel(funcName), 0, labelManager)
+            emitter = TACFuncEmitter(FuncLabel(funcName), len(astFunc.params.children), labelManager)
+            for child in astFunc.params.children:
+                child.accept(self, emitter)
             astFunc.body.accept(self, emitter) #调用不同的visit函数
             tacFuncs.append(emitter.visitEnd())
-        return TACProg(tacFuncs)
+        return TACProg(tacFuncs, tacGlobalVars)
 
     def visitBlock(self, block: Block, mv: TACFuncEmitter) -> None:
         for child in block:
             child.accept(self, mv)
+
+    def visitPostfix(self, postfix: Postfix, mv: TACFuncEmitter) -> None:
+        # print("visitPostfix")
+        for expr in postfix.exprlist.children:
+            expr.accept(self, mv)
+        for expr in postfix.exprlist.children:
+            mv.visitParam(expr.getattr("val"))
+        postfix.setattr('val', mv.visitCall(FuncLabel(postfix.ident.value)))
+
+    def visitParameter(self, param: Parameter, mv: TACFuncEmitter) -> None:
+        # print("visitparameter")
+        param.getattr("symbol").temp = mv.freshTemp()
 
     def visitReturn(self, stmt: Return, mv: TACFuncEmitter) -> None:
         stmt.expr.accept(self, mv)
@@ -165,6 +188,8 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         1. Set the 'val' attribute of ident as the temp variable of the 'symbol' attribute of ident.
         """
         symbol = ident.getattr("symbol")
+        # print(symbol.__dict__)
+        # breakpoint()
         ident.setattr("val", symbol.temp)
         # print("symbol.temp:", symbol.temp)
         # raise NotImplementedError
@@ -179,17 +204,6 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         new_temp = mv.freshTemp()
         symbol.temp = new_temp
         if decl.init_expr is not NULL:
-            # print("new_temp:", new_temp)
-            # print(decl.init_expr)
-            # print(type(decl.init_expr))
-            # print(decl)
-            # if type(decl.init_expr) == IntLiteral:
-            #     init_temp = mv.visitLoad(decl.init_expr.value)
-            #     mv.visitAssignment(new_temp, init_temp)
-            # elif type(decl.init_expr) == NullType:
-            #     init_temp = mv.visitLoad(0)
-            #     mv.visitAssignment(new_temp, init_temp)
-            # else:
             init_temp = decl.init_expr.accept(self, mv)
             mv.visitAssignment(new_temp, decl.init_expr.getattr("val")) #?
             

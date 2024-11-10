@@ -38,7 +38,7 @@ class TACInstr:
 
     def accept(self, v: TACVisitor) -> None:
         pass
-
+    
 
 # Assignment instruction.
 class Assign(TACInstr):
@@ -67,6 +67,30 @@ class LoadImm4(TACInstr):
     def accept(self, v: TACVisitor) -> None:
         v.visitLoadImm4(self)
 
+class Param(TACInstr):
+    def __init__(self, param: Temp) -> None:
+        super().__init__(InstrKind.PARAM, [], [param], None)
+        self.param = param
+        
+    def __str__(self) -> str:
+        return "PARAM " + str(self.param)
+    
+    def accept(self, v: TACVisitor) -> None:
+        v.visitParam(self)
+    
+class Call(TACInstr):
+    def __init__(self, param: Temp, label: Label) -> None:
+        super().__init__(InstrKind.CALL, [param], [], label)
+        self.param = param
+        self.label = label
+        
+    def __str__(self) -> str:
+        return str(self.param) + " = CALL " + str(self.label)
+    
+    def accept(self, v: TACVisitor) -> None:
+        v.visitCall(self)
+        
+    
 
 # Unary operations.
 class Unary(TACInstr):

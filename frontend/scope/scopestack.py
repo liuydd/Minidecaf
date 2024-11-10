@@ -54,6 +54,9 @@ class ScopeStack:
                 return self.stack[d].get(name)
         return None
     
+    def lookup_top(self, name: str) -> Optional[Symbol]:
+        return self.currentScope().lookup(name)
+    
     #检查 break/continue 语句是否在一个循环内
     def openLoop(self) -> None:
         self.loopdepth += 1

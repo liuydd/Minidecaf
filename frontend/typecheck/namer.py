@@ -1,8 +1,9 @@
 from typing import Protocol, TypeVar, cast
 
-from frontend.ast.node import Node, NullType
+from frontend.ast.node import T, Node, NullType
 from frontend.ast.tree import *
-from frontend.ast.visitor import RecursiveVisitor, Visitor
+from frontend.ast.tree import T, ExpressionList, Parameter, Postfix
+from frontend.ast.visitor import T, RecursiveVisitor, Visitor
 from frontend.scope.globalscope import GlobalScope
 from frontend.scope.scope import Scope, ScopeKind
 from frontend.scope.scopestack import ScopeStack
@@ -29,7 +30,7 @@ class Namer(Visitor[ScopeStack, None]):
         # Global scope. You don't have to consider it until Step 6.
         program.globalScope = GlobalScope
         ctx = ScopeStack(program.globalScope)
-
+        # breakpoint()
         program.accept(self, ctx)
         return program
 
@@ -37,20 +38,63 @@ class Namer(Visitor[ScopeStack, None]):
         # Check if the 'main' function is missing
         if not program.hasMainFunc():
             raise DecafNoMainFuncError
-
+        # print(program.functions())
         for func in program.functions().values():
             func.accept(self, ctx)
 
     def visitFunction(self, func: Function, ctx: ScopeStack) -> None:
         # func.body.accept(self, ctx)
-        if ctx.isConflict(func.ident.value):
-            raise DecafDeclConflictError
-        else:
-            newSymbol = FuncSymbol(func.ident.value, func.ret_t.type, ctx.currentScope())
-            ctx.declare(newSymbol)
-            func.body.accept(self, ctx)
+        # print(GlobalScope.symbols)
+        # print(func.__dict__)
+        if ctx.isConflict(func.ident.value) or GlobalScope.lookup(func.ident.value):
+            raise DecafDeclConflictError(func.ident.value)
+        # breakpoint()
+        newSymbol = FuncSymbol(func.ident.value, func.ret_t.type, ctx.currentScope())
+        if func.params is not None:
+            for param in func.params.children:
+                newSymbol.addParaType(param.var_t.type)
+        GlobalScope.declare(newSymbol)
+        func.setattr("symbol", newSymbol)
+        # print(func.__dict__)
+        func_scope = Scope(ScopeKind.LOCAL)
+        ctx.addScope(func_scope)
+        # ctx.declare(newSymbol)
+        func.params.accept(self, ctx)
+        # func.body.accept(self, ctx, func.params)
+        for child in func.body.children:
+            child.accept(self, ctx)
+        ctx.popScope()
             
+    def visitParameter(self, param: Parameter, ctx: ScopeStack) -> None:
+        if ctx.lookup(param.ident.value):
+            raise DecafDeclConflictError(param.ident.value)
+        newSymbol = VarSymbol(param.ident.value, param.var_t.type)
+        ctx.declare(newSymbol)
+        param.setattr("symbol", newSymbol)
+        param.ident.setattr('type', newSymbol.type)
             
+    def visitParameterList(self, params: ParameterList, ctx: ScopeStack) -> None:
+        for child in params.children:
+            child.accept(self, ctx)
+            
+    def visitExpressionList(self, exprlist: ExpressionList, ctx: ScopeStack) -> None:
+        for child in exprlist.children:
+            child.accept(self, ctx)
+            
+    def visitPostfix(self, postfix: Postfix, ctx: ScopeStack) -> None:
+        # breakpoint()
+        # if not ctx.lookup(postfix.ident.value): raise DecafUndefinedVarError(postfix.ident.value)
+        if ctx.lookup_top(postfix.ident.value):
+            raise DecafBadFuncCallError(postfix.ident.value)
+        func = GlobalScope.lookup(postfix.ident.value)
+        if not func or not func.isFunc: raise DecafUndefinedVarError(postfix.ident.value)
+        if func.parameterNum != len(postfix.exprlist):
+            raise DecafBadFuncCallError(postfix.ident.value)
+        postfix.ident.setattr('symbol', func)
+        postfix.setattr('type', func.type)
+        for expr in postfix.exprlist:
+            expr.accept(self, ctx)
+        
 
     def visitBlock(self, block: Block, ctx: ScopeStack) -> None:
         # for child in block:
@@ -173,6 +217,7 @@ class Namer(Visitor[ScopeStack, None]):
         3. Set the 'symbol' attribute of ident.
         """
         symbol = ctx.lookup(ident.value)
+        # breakpoint()
         if symbol is None:
             raise DecafUndefinedVarError(ident.value)
         ident.setattr("symbol", symbol)

@@ -16,14 +16,16 @@ class Asm:
 
     def transform(self, prog: TACProg):
         analyzer = LivenessAnalyzer()
-        
+        emitter = RiscvAsmEmitter(Riscv.AllocatableRegs, Riscv.CallerSaved)
         for func in prog.funcs:
-            emitter = RiscvAsmEmitter(Riscv.AllocatableRegs, Riscv.CallerSaved)
+            # print(func.__dict__)
+            # emitter = RiscvAsmEmitter(Riscv.AllocatableRegs, Riscv.CallerSaved)
             reg_alloc = BruteRegAlloc(emitter)
             pair = emitter.selectInstr(func) #指令选择将中端TAC代码转换为riscv汇编代码
             builder = CFGBuilder()
             cfg: CFG = builder.buildFrom(pair[0])
             analyzer.accept(cfg)
             reg_alloc.accept(cfg, pair[1])
+            # breakpoint()
 
         return emitter.emitEnd()

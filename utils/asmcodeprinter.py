@@ -9,11 +9,17 @@ class AsmCodePrinter:
     def __init__(self) -> None:
         self.buffer = ""
 
+    def debug_buffer(self):
+        return self.buffer
+
     def printf(self, fmt: str, **args):
         self.buffer += self.INDENTS + fmt.format(**args)
 
     def println(self, fmt: str, **args):
         self.buffer += self.INDENTS + fmt.format(**args) + "\n"
+
+    def printGlobalVar(self, symbol: str, value: int):
+        self.buffer += ".globl " + symbol + "\n" + symbol + ":\n" + self.INDENTS + ".word " + str(value) + "\n"
 
     def printLabel(self, label: Label):
         self.buffer += str(label.name) + ":\n"

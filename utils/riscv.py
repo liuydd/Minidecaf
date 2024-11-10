@@ -172,6 +172,17 @@ class Riscv:
             return "addi " + Riscv.FMT3.format(
                 str(Riscv.SP), str(Riscv.SP), str(self.offset)
             )
+            
+    class FPAdd(BackendInstr):
+        def __init__(self, offset: int) -> None:
+            super().__init__(InstrKind.SEQ, [Riscv.FP], [Riscv.SP], None)
+            self.offset = offset
+
+        def __str__(self) -> str:
+            assert -2048 <= self.offset <= 2047  # Riscv imm [11:0]
+            return "addi " + Riscv.FMT3.format(
+                str(Riscv.FP), str(Riscv.SP), str(self.offset)
+            )
 
     class NativeStoreWord(BackendInstr):
         def __init__(self, src: Reg, base: Reg, offset: int) -> None:
@@ -205,3 +216,19 @@ class Riscv:
 
         def __str__(self) -> str:
             return "ret"
+        
+    class Param(BackendInstr):
+        def __init__(self, src: Reg) -> None:
+            super().__init__(InstrKind.PARAM, [], [src], None)
+            self.src = src
+
+        def __str__(self) -> str:
+            return "beq " + str(self.src)
+        
+    class Call(BackendInstr):
+        def __init__(self, target: Label) -> None:
+            super().__init__(InstrKind.CALL, [], [], target)
+            self.target = target
+            
+        def __str__(self) -> str:
+            return "call " + super(FuncLabel, self.target).__str__()

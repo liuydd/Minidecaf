@@ -67,6 +67,40 @@ class LoadImm4(TACInstr):
     def accept(self, v: TACVisitor) -> None:
         v.visitLoadImm4(self)
 
+class LoadAddress(TACInstr):
+    def __init__(self, symbol, dst: Temp) -> None:
+        super().__init__(InstrKind.SEQ, [dst], [], None)
+        self.symbol = symbol
+    
+    def __str__(self) -> str:
+        return "%s = LOAD_SYMBOL %s" % (self.dsts[0], self.symbol.name)
+    
+    def accept(self, v: TACVisitor) -> None:
+        v.visitLoadAddress(self)
+        
+    
+class LoadData(TACInstr):
+    def __init__(self, dst: Temp, base: Temp, offset: int):
+        super().__init__(InstrKind.SEQ, [dst], [base], None)
+        self.offset = offset
+    
+    def __str__(self) -> str:
+        return "%s = LOAD %s %d" % (self.dsts[0], self.srcs[0], self.offset)
+    
+    def accept(self, v: TACVisitor) -> None:
+        v.visitLoadData(self)
+    
+class StoreData(TACInstr):
+    def __init__(self, src: Temp, base: Temp, offset: int):
+        super().__init__(InstrKind.SEQ, [], [src, base], None)
+        self.offset = offset
+
+    def __str__(self) -> str:
+        return "STORE %s %s, %d" % (self.srcs[0], self.srcs[1], self.offset)
+
+    def accept(self, v: TACVisitor) -> None:
+        return v.visitStoreData(self)
+
 class Param(TACInstr):
     def __init__(self, param: Temp) -> None:
         super().__init__(InstrKind.PARAM, [], [param], None)

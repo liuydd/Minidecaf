@@ -8,6 +8,7 @@ from frontend.type.array import ArrayType
 from utils.label.blocklabel import BlockLabel
 from utils.label.funclabel import FuncLabel
 from utils.tac import tacop
+from utils.tac.tacinstr import LoadAddress, LoadData, StoreData
 from utils.tac.temp import Temp
 from utils.tac.tacinstr import *
 from utils.tac.tacfunc import TACFunc
@@ -82,6 +83,21 @@ class TACFuncEmitter(TACVisitor):
         temp = self.freshTemp()
         self.func.add(LoadImm4(temp, value))
         return temp
+    
+    def visitLoadAddress(self, symbol: VarSymbol) -> Temp:
+        temp = self.freshTemp()
+        self.func.add(LoadAddress(symbol, temp))
+        return temp
+    
+    def visitLoadData(self, symbol: VarSymbol, offset: int = 0) -> Temp:
+        address = self.visitLoadAddress(symbol)
+        self.func.add(LoadData(address, address, offset))
+        return address
+    
+    def visitStoreData(self, symbol: VarSymbol, value: Temp, offset: int = 0) -> None:
+        address = self.visitLoadAddress(symbol)
+        self.func.add(StoreData(value, address, offset))
+        
 
     def visitUnary(self, op: UnaryOp, operand: Temp) -> Temp:
         temp = self.freshTemp()
@@ -188,11 +204,10 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         1. Set the 'val' attribute of ident as the temp variable of the 'symbol' attribute of ident.
         """
         symbol = ident.getattr("symbol")
-        # print(symbol.__dict__)
-        # breakpoint()
-        ident.setattr("val", symbol.temp)
-        # print("symbol.temp:", symbol.temp)
-        # raise NotImplementedError
+        if symbol.isGlobal:
+            ident.setattr("val", mv.visitLoadData(symbol))
+        else:
+            ident.setattr("val", symbol.temp)
 
     def visitDeclaration(self, decl: Declaration, mv: TACFuncEmitter) -> None:
         """
@@ -216,14 +231,13 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         3. Set the 'val' attribute of expr as the value of assignment instruction.
         """
         expr.rhs.accept(self, mv)
-        # breakpoint()
-        lhs_symbol = expr.lhs.getattr("symbol").temp
-        # print(lhs_symbol)
         rhs_symbol = expr.rhs.getattr("val")
-        # print(lhs_symbol)
-        rhs_temp = mv.visitAssignment(lhs_symbol, rhs_symbol)
-        expr.setattr("val", rhs_temp)
-        # raise NotImplementedError
+        if expr.lhs.getattr("symbol").isGlobal:
+            mv.visitStoreData(expr.lhs.getattr('symbol'), rhs_symbol)
+        else:
+            lhs_symbol = expr.lhs.getattr("symbol").temp
+            rhs_temp = mv.visitAssignment(lhs_symbol, rhs_symbol)
+        expr.setattr("val", rhs_symbol)
 
     def visitIf(self, stmt: If, mv: TACFuncEmitter) -> None:
         stmt.cond.accept(self, mv)

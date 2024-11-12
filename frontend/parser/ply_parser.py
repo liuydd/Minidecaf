@@ -49,8 +49,8 @@ def p_program(p):
 
 def p_element(p):
     """
-    element : declaration Semi
-            | function
+    element : function
+            | declaration Semi
     """
     p[0] = p[1]
     

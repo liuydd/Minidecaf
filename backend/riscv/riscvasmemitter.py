@@ -11,6 +11,7 @@ from utils.tac.tacvisitor import TACVisitor
 from utils.asmcodeprinter import AsmCodePrinter
 from utils.tac.backendinstr import BackendInstr
 from ..subroutineinfo import SubroutineInfo
+from frontend.ast.tree import *
 
 """
 RiscvAsmEmitter: an AsmEmitter for RiscV
@@ -22,6 +23,7 @@ class RiscvAsmEmitter():
         self,
         allocatableRegs: list[Reg],
         callerSaveRegs: list[Reg],
+        globalVars: dict[str, Declaration],
     ):
         self.allocatableRegs = allocatableRegs
         self.callerSaveRegs = callerSaveRegs
@@ -29,6 +31,11 @@ class RiscvAsmEmitter():
     
         # the start of the asm code
         # int step10, you need to add the declaration of global var here
+        self.printer.println(".data")
+        for symbol, decl in globalVars.items():
+            self.printer.printGlobalVar(symbol, decl.getattr("symbol").initValue)
+        self.printer.println("")
+        
         self.printer.println(".text")
         self.printer.println(".global main")
         self.printer.println("")
@@ -85,6 +92,15 @@ class RiscvAsmEmitter():
 
         def visitLoadImm4(self, instr: LoadImm4) -> None:
             self.seq.append(Riscv.LoadImm(instr.dst, instr.value))
+            
+        def visitLoadAddress(self, instr: LoadAddress) -> None:
+            self.seq.append(Riscv.LoadAddress(instr.symbol.name, instr.dsts[0]))
+        
+        def visitLoadData(self, instr: LoadData) -> None:
+            self.seq.append(Riscv.LoadData(instr.dsts[0], instr.srcs[0], instr.offset)) 
+                
+        def visitStoreData(self, instr: StoreData) -> None:
+            self.seq.append(Riscv.StoreData(instr.srcs[0], instr.srcs[1], instr.offset))
 
         def visitUnary(self, instr: Unary) -> None:
             op = {

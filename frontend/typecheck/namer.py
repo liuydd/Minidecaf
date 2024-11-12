@@ -39,7 +39,8 @@ class Namer(Visitor[ScopeStack, None]):
         if not program.hasMainFunc():
             raise DecafNoMainFuncError
         # print(program.functions())
-        for func in program.functions().values():
+        # for func in program.functions().values():
+        for func in program.children:
             func.accept(self, ctx)
 
     def visitFunction(self, func: Function, ctx: ScopeStack) -> None:
@@ -174,16 +175,16 @@ class Namer(Visitor[ScopeStack, None]):
         # if ctx.lookup(decl.ident.value) is not None: raise DecafUndefinedVarError(f"Variable {decl.ident.value} already declared")
         else:
             new_symbol = VarSymbol(decl.ident.value, decl.var_t)
+            if ctx.isGlobalScope():
+                new_symbol.isGlobal = True
+                if decl.init_expr:
+                    new_symbol.initValue = decl.init_expr.value
+                elif new_symbol.type == INT:
+                    decl.init_expr = IntLiteral(0)
             ctx.declare(new_symbol)
-            # print(ctx.symbols)
-            # print("decl:", decl)
-            # print("decl.indent:", decl.ident)
             decl.setattr("symbol", new_symbol)
-            # print(decl.ident.getattr("symbol"))
             if decl.init_expr is not None:
-                # print("decl.init_expr:", decl.init_expr)
                 decl.init_expr.accept(self, ctx)
-            # raise NotImplementedError
 
     def visitAssignment(self, expr: Assignment, ctx: ScopeStack) -> None:
         """
@@ -217,7 +218,6 @@ class Namer(Visitor[ScopeStack, None]):
         3. Set the 'symbol' attribute of ident.
         """
         symbol = ctx.lookup(ident.value)
-        # breakpoint()
         if symbol is None:
             raise DecafUndefinedVarError(ident.value)
         ident.setattr("symbol", symbol)
@@ -225,5 +225,6 @@ class Namer(Visitor[ScopeStack, None]):
 
     def visitIntLiteral(self, expr: IntLiteral, ctx: ScopeStack) -> None:
         value = expr.value
+        expr.setattr('type', INT)
         if value > MAX_INT:
             raise DecafBadIntValueError(value)

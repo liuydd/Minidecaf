@@ -286,6 +286,24 @@ def p_declaration_init(p):
     """
     p[0] = Declaration(p[1], p[2], p[4])
 
+def p_declaration_array(p):
+    """
+    declaration : type Identifier dim_list
+    """
+    p[0] = Declaration(p[1], p[2], None, p[3])
+    
+def p_declaration_array_empty(p):
+    """
+    dim_list : empty
+    """
+    p[0] = []
+
+def p_declaration_array_dim(p):
+    """
+    dim_list : dim_list LBracket Integer RBracket
+    """
+    p[1].append(p[3])
+    p[0] = p[1]
 
 def p_expression_precedence(p):
     """
@@ -337,6 +355,12 @@ def p_postfix(p):
     postfix : Identifier LParen expression_list RParen
     """
     p[0] = Postfix(p[1], p[3])
+    
+def p_postfix_index_expr(p):
+    """
+    postfix : postfix LBracket expression RBracket
+    """
+    p[0] = IndexExpr(p[1], p[3])
 
 def p_unary_expression(p):
     """
@@ -349,7 +373,7 @@ def p_unary_expression(p):
 
 def p_binary_expression(p):
     """
-    assignment : Identifier Assign expression
+    assignment : postfix Assign expression
     logical_or : logical_or Or logical_and
     logical_and : logical_and And bit_or
     bit_or : bit_or BitOr xor

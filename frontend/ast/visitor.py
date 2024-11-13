@@ -24,6 +24,9 @@ class Visitor(Protocol[T, U]):  # type: ignore
 
     def visitNULL(self, that: NullType, ctx: T) -> Optional[U]:
         return self.visitOther(that, ctx)
+    
+    def visitIndexExpr(self, that: IndexExpr, ctx: T) -> Optional[U]:
+        return self.visitOther(that, ctx)
 
     def visitProgram(self, that: Program, ctx: T) -> Optional[Sequence[Optional[U]]]:
         return self.visitOther(that, ctx)

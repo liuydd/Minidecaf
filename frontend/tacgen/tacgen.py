@@ -1,5 +1,5 @@
 from frontend.ast.node import Optional, NullType
-from frontend.ast.tree import Continue, Function, Optional, Parameter, Postfix
+from frontend.ast.tree import Continue, Function, IndexExpr, Optional, Parameter, Postfix
 from frontend.ast import node
 from frontend.ast.tree import *
 from frontend.ast.visitor import Visitor
@@ -14,6 +14,7 @@ from utils.tac.tacinstr import *
 from utils.tac.tacfunc import TACFunc
 from utils.tac.tacprog import TACProg
 from utils.tac.tacvisitor import TACVisitor
+from typing import Any, Optional, Union, Dict
 
 
 """
@@ -41,10 +42,10 @@ class TACFuncEmitter(TACVisitor):
     """
 
     def __init__(
-        self, entry: FuncLabel, numArgs: int, labelManager: LabelManager
+        self, entry: FuncLabel, numArgs: int, arrays: Dict[str, VarSymbol], labelManager: LabelManager
     ) -> None:
         self.labelManager = labelManager
-        self.func = TACFunc(entry, numArgs)
+        self.func = TACFunc(entry, numArgs, arrays)
         self.visitLabel(entry)
         self.nextTempId = 0
 
@@ -98,6 +99,13 @@ class TACFuncEmitter(TACVisitor):
         address = self.visitLoadAddress(symbol)
         self.func.add(StoreData(value, address, offset))
         
+    def visitLoadArrayAddress(self, address: Temp):
+        dst = self.freshTemp()
+        self.func.add(LoadData(dst, address, 0))
+        return dst
+    
+    def visitStoreArray(self, value: Temp, address: Temp):
+        self.func.add(StoreData(value, address, 0))
 
     def visitUnary(self, op: UnaryOp, operand: Temp) -> Temp:
         temp = self.freshTemp()
@@ -166,7 +174,7 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         tacGlobalVars = program.globalVars()
         for funcName, astFunc in program.functions().items(): #遍历每个函数?
             # in step9, you need to use real parameter count
-            emitter = TACFuncEmitter(FuncLabel(funcName), len(astFunc.params.children), labelManager)
+            emitter = TACFuncEmitter(FuncLabel(funcName), len(astFunc.params.children), astFunc.arrays, labelManager)
             for child in astFunc.params.children:
                 child.accept(self, emitter)
             astFunc.body.accept(self, emitter) #调用不同的visit函数
@@ -204,7 +212,9 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         1. Set the 'val' attribute of ident as the temp variable of the 'symbol' attribute of ident.
         """
         symbol = ident.getattr("symbol")
-        if symbol.isGlobal:
+        if isinstance(symbol.type, ArrayType):
+            ident.setattr("addr", mv.visitLoadAddress(symbol))
+        elif symbol.isGlobal:
             ident.setattr("val", mv.visitLoadData(symbol))
         else:
             ident.setattr("val", symbol.temp)
@@ -223,6 +233,19 @@ class TACGen(Visitor[TACFuncEmitter, None]):
             mv.visitAssignment(new_temp, decl.init_expr.getattr("val")) #?
             
         # raise NotImplementedError
+        
+    def visitIndexExpr(self, expr: IndexExpr, mv: TACFuncEmitter) -> None:
+        expr.base.setattr('slice', True)
+        expr.base.accept(self, mv)
+        expr.index.accept(self, mv)
+        #! 递归计算偏移量
+        addr = mv.visitLoad(expr.getattr('type').size)
+        mv.visitBinarySelf(tacop.TacBinaryOp.MUL, addr, expr.index.getattr('val'))
+        mv.visitBinarySelf(tacop.TacBinaryOp.ADD, addr, expr.base.getattr('addr'))
+        expr.setattr('addr', addr)
+        #! 递归计算完毕, 计算数组元素值
+        if not expr.getattr('slice'):
+            expr.setattr('val', mv.visitLoadArrayAddress(addr))
 
     def visitAssignment(self, expr: Assignment, mv: TACFuncEmitter) -> None:
         """
@@ -232,7 +255,11 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         """
         expr.rhs.accept(self, mv)
         rhs_symbol = expr.rhs.getattr("val")
-        if expr.lhs.getattr("symbol").isGlobal:
+        if isinstance(expr.lhs, IndexExpr):
+            expr.lhs.setattr('slice', True)
+            expr.lhs.accept(self, mv)
+            mv.visitStoreArray(expr.rhs.getattr('val'), expr.lhs.getattr('addr'))
+        elif expr.lhs.getattr("symbol").isGlobal:
             mv.visitStoreData(expr.lhs.getattr('symbol'), rhs_symbol)
         else:
             lhs_symbol = expr.lhs.getattr("symbol").temp

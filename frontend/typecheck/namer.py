@@ -2,7 +2,7 @@ from typing import Protocol, TypeVar, cast
 
 from frontend.ast.node import T, Node, NullType
 from frontend.ast.tree import *
-from frontend.ast.tree import T, ExpressionList, Parameter, Postfix
+from frontend.ast.tree import T, ExpressionList, IndexExpr, Parameter, Postfix
 from frontend.ast.visitor import T, RecursiveVisitor, Visitor
 from frontend.scope.globalscope import GlobalScope
 from frontend.scope.scope import Scope, ScopeKind
@@ -23,7 +23,7 @@ syntax tree and store them in symbol tables (i.e. scopes).
 
 class Namer(Visitor[ScopeStack, None]):
     def __init__(self) -> None:
-        pass
+        self.arrays = {}
 
     # Entry of this phase
     def transform(self, program: Program) -> Program:
@@ -59,11 +59,12 @@ class Namer(Visitor[ScopeStack, None]):
         # print(func.__dict__)
         func_scope = Scope(ScopeKind.LOCAL)
         ctx.addScope(func_scope)
-        # ctx.declare(newSymbol)
+        self.arrays = {}
         func.params.accept(self, ctx)
         # func.body.accept(self, ctx, func.params)
         for child in func.body.children:
             child.accept(self, ctx)
+        func.arrays = self.arrays
         ctx.popScope()
             
     def visitParameter(self, param: Parameter, ctx: ScopeStack) -> None:
@@ -108,6 +109,9 @@ class Namer(Visitor[ScopeStack, None]):
 
     def visitReturn(self, stmt: Return, ctx: ScopeStack) -> None:
         stmt.expr.accept(self, ctx)
+        if stmt.expr.getattr("type"):
+            if stmt.expr.getattr('type') != INT:
+                raise DecafBadReturnTypeError()
 
     """
     def visitFor(self, stmt: For, ctx: Scope) -> None:
@@ -174,7 +178,15 @@ class Namer(Visitor[ScopeStack, None]):
         if ctx.isConflict(decl.ident.value): raise DecafUndefinedVarError(f"Variable {decl.ident.value} already declared")
         # if ctx.lookup(decl.ident.value) is not None: raise DecafUndefinedVarError(f"Variable {decl.ident.value} already declared")
         else:
-            new_symbol = VarSymbol(decl.ident.value, decl.var_t)
+            if decl.init_dim:
+                for dim in decl.init_dim:
+                    if dim.value <= 0:
+                        raise DecafBadArraySizeError()
+                decl_type = ArrayType.multidim(decl.var_t.type, *[dim.value for dim in decl.init_dim])
+                new_symbol = VarSymbol(decl.ident.value, decl_type)
+                self.arrays[decl.ident.value] = new_symbol
+            else:
+                new_symbol = VarSymbol(decl.ident.value, decl.var_t.type)
             if ctx.isGlobalScope():
                 new_symbol.isGlobal = True
                 if decl.init_expr:
@@ -183,8 +195,18 @@ class Namer(Visitor[ScopeStack, None]):
                     decl.init_expr = IntLiteral(0)
             ctx.declare(new_symbol)
             decl.setattr("symbol", new_symbol)
+            decl.setattr("type", new_symbol.type)
+            decl.ident.type = new_symbol.type
             if decl.init_expr is not None:
                 decl.init_expr.accept(self, ctx)
+
+    def visitIndexExpr(self, expr: IndexExpr, ctx: ScopeStack) -> None:
+        expr.base.accept(self, ctx)
+        expr.index.accept(self, ctx)
+        if isinstance(expr.base, Identifier): #有个递归
+            expr.setattr('type', expr.base.getattr('symbol').type.indexed)
+        else:
+            expr.setattr('type', expr.base.getattr('type').indexed)
 
     def visitAssignment(self, expr: Assignment, ctx: ScopeStack) -> None:
         """
@@ -192,15 +214,27 @@ class Namer(Visitor[ScopeStack, None]):
         """
         expr.lhs.accept(self, ctx)
         expr.rhs.accept(self, ctx)
+        # breakpoint()
+        if expr.lhs.getattr('type') != expr.rhs.getattr('type'):
+            raise DecafTypeMismatchError()
+        expr.setattr('type', expr.lhs.getattr('type'))
         # raise NotImplementedError
 
 
     def visitUnary(self, expr: Unary, ctx: ScopeStack) -> None:
         expr.operand.accept(self, ctx)
+        if expr.operand.getattr("type") != INT:
+            raise DecafTypeMismatchError()
+        expr.operand.setattr("type", INT)
 
     def visitBinary(self, expr: Binary, ctx: ScopeStack) -> None:
         expr.lhs.accept(self, ctx)
         expr.rhs.accept(self, ctx)
+        if isinstance(expr.lhs.getattr('type'), ArrayType):
+            raise DecafTypeMismatchError()
+        if expr.lhs.getattr('type') != expr.rhs.getattr('type'):
+            raise DecafTypeMismatchError()
+        expr.setattr('type', expr.lhs.getattr('type'))
 
     def visitCondExpr(self, expr: ConditionExpression, ctx: ScopeStack) -> None:
         """
@@ -209,7 +243,9 @@ class Namer(Visitor[ScopeStack, None]):
         expr.cond.accept(self, ctx)
         expr.then.accept(self, ctx)
         expr.otherwise.accept(self, ctx)
-        # raise NotImplementedError
+        if expr.then.getattr('type') != expr.otherwise.getattr('type'):
+            raise DecafTypeMismatchError()
+        expr.setattr('type', INT)
 
     def visitIdentifier(self, ident: Identifier, ctx: ScopeStack) -> None:
         """
@@ -221,6 +257,7 @@ class Namer(Visitor[ScopeStack, None]):
         if symbol is None:
             raise DecafUndefinedVarError(ident.value)
         ident.setattr("symbol", symbol)
+        ident.setattr("type", symbol.type)
         # raise NotImplementedError
 
     def visitIntLiteral(self, expr: IntLiteral, ctx: ScopeStack) -> None:

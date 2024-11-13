@@ -210,6 +210,17 @@ class Riscv:
             return "addi " + Riscv.FMT3.format(
                 str(Riscv.FP), str(Riscv.SP), str(self.offset)
             )
+            
+    class ImmAdd(BackendInstr):
+        def __init__(self, dst: Temp, src: Temp, value: int) -> None:
+            super().__init__(InstrKind.SEQ, [dst], [src], None)
+            self.value = value
+            
+        def __str__(self) -> str:
+            assert -2048 <= self.value <= 2047  # Riscv imm [11:0]
+            return "addi " + Riscv.FMT3.format(
+                str(self.dsts[0]), str(self.srcs[0]), str(self.value)
+            )
 
     class NativeStoreWord(BackendInstr):
         def __init__(self, src: Reg, base: Reg, offset: int) -> None:

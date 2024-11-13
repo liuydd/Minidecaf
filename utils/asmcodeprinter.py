@@ -20,6 +20,14 @@ class AsmCodePrinter:
 
     def printGlobalVar(self, symbol: str, value: int):
         self.buffer += ".globl " + symbol + "\n" + symbol + ":\n" + self.INDENTS + ".word " + str(value) + "\n"
+        
+    def printGlobalArray(self, symbol: str, value: int):
+        self.buffer += ".globl " + symbol + "\n" + symbol + ":\n" + self.INDENTS + ".space " + str(value) + "\n"
+        
+    def printGlobalInitArray(self, symbol: str, vals: list[int]):
+        self.buffer += ".globl " + symbol + "\n" + symbol + ":\n"
+        for v in vals:
+            self.buffer += self.INDENTS + ".word " + str(v) + "\n"
 
     def printLabel(self, label: Label):
         self.buffer += str(label.name) + ":\n"

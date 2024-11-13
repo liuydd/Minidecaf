@@ -33,7 +33,16 @@ class RiscvAsmEmitter():
         # int step10, you need to add the declaration of global var here
         self.printer.println(".data")
         for symbol, decl in globalVars.items():
-            self.printer.printGlobalVar(symbol, decl.getattr("symbol").initValue)
+            if not decl.init_dim:
+                self.printer.printGlobalVar(symbol, decl.getattr("symbol").initValue)
+            # if decl.init_dim and decl.init_expr:
+            #     self.printer.printGlobalInitArray(symbol, decl.getattr("symbol").initValue)
+        self.printer.println("")
+        
+        self.printer.println(".bss")
+        for symbol, decl in globalVars.items():
+            if decl.init_dim and not decl.init_expr:
+                self.printer.printGlobalArray(symbol, decl.getattr("symbol").type.size)
         self.printer.println("")
         
         self.printer.println(".text")
@@ -43,10 +52,10 @@ class RiscvAsmEmitter():
     # transform tac instrs to RiscV instrs
     # collect some info which is saved in SubroutineInfo for SubroutineEmitter
     def selectInstr(self, func: TACFunc) -> tuple[list[str], SubroutineInfo]:
-        info = SubroutineInfo(func.entry, func.numArgs)
+        info = SubroutineInfo(func.entry, func.numArgs, func.arrays)
 
         selector: RiscvAsmEmitter.RiscvInstrSelector = (
-            RiscvAsmEmitter.RiscvInstrSelector(func.entry)
+            RiscvAsmEmitter.RiscvInstrSelector(func.entry, info)
         )
         # print(selector.__dict__)
         for instr in func.getInstrSeq():
@@ -61,9 +70,10 @@ class RiscvAsmEmitter():
         return self.printer.close()
 
     class RiscvInstrSelector(TACVisitor):
-        def __init__(self, entry: Label) -> None:
+        def __init__(self, entry: Label, info: SubroutineInfo) -> None:
             self.entry = entry
             self.seq = []
+            self.info = info
 
         def visitOther(self, instr: TACInstr) -> None:
             raise NotImplementedError("RiscvInstrSelector visit{} not implemented".format(type(instr).__name__))
@@ -94,7 +104,10 @@ class RiscvAsmEmitter():
             self.seq.append(Riscv.LoadImm(instr.dst, instr.value))
             
         def visitLoadAddress(self, instr: LoadAddress) -> None:
-            self.seq.append(Riscv.LoadAddress(instr.symbol.name, instr.dsts[0]))
+            if instr.symbol.isGlobal:
+                self.seq.append(Riscv.LoadAddress(instr.symbol.name, instr.dsts[0]))
+            else:
+                self.seq.append(Riscv.ImmAdd(instr.dsts[0], Riscv.SP, self.info.offsets[instr.symbol.name]))
         
         def visitLoadData(self, instr: LoadData) -> None:
             self.seq.append(Riscv.LoadData(instr.dsts[0], instr.srcs[0], instr.offset)) 
@@ -168,7 +181,7 @@ class RiscvSubroutineEmitter():
         self.printer = emitter.printer
         
         # + 8 is for the RA and S0 reg 
-        self.nextLocalOffset = 4 * len(Riscv.CalleeSaved) + + self.info.size + 8
+        self.nextLocalOffset = 4 * len(Riscv.CalleeSaved) + self.info.size + 8
         
         # the buf which stored all the NativeInstrs in this function
         self.buf: list[BackendInstr] = []

@@ -35,8 +35,8 @@ class RiscvAsmEmitter():
         for symbol, decl in globalVars.items():
             if not decl.init_dim:
                 self.printer.printGlobalVar(symbol, decl.getattr("symbol").initValue)
-            # if decl.init_dim and decl.init_expr:
-            #     self.printer.printGlobalInitArray(symbol, decl.getattr("symbol").initValue)
+            if decl.init_dim and decl.init_expr:
+                self.printer.printGlobalInitArray(symbol, decl.getattr("symbol").initValue)
         self.printer.println("")
         
         self.printer.println(".bss")

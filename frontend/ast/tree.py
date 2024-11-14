@@ -6,7 +6,7 @@ Modify this file if you want to add a new AST node.
 
 from __future__ import annotations
 
-from typing import Any, Generic, Optional, TypeVar, Union
+from typing import Any, Generic, Optional, TypeVar, Union, List
 
 from frontend.type import INT, DecafType
 from utils import T, U
@@ -96,6 +96,7 @@ class Function(Node):
         self.body = body
         self.params = params
         self.arrays = {}
+        self.p_arrays = []
 
     def __getitem__(self, key: int) -> Node:
         if self.params == None:
@@ -130,18 +131,20 @@ class Parameter(Node):
         self, 
         var_t: TypeLiteral,
         ident: Identifier,
+        init_dim: Optional[list[IntLiteral]] = None,
     ) -> None:
         super().__init__("parameter")
         self.var_t = var_t
         self.ident = ident
+        self.init_dim = init_dim or NULL
     
     def __getitem__(self, key: int) -> Node:
         return(
-            self.var_t, self.ident
+            self.var_t, self.ident, self.init_dim
         )[key]
         
     def __len__(self) -> int:
-        return 2
+        return 3
     
     def accept(self, v: Visitor[T, U], ctx: T):
         return v.visitParameter(self, ctx)
@@ -575,3 +578,18 @@ class IndexExpr(Expression):
 
     def accept(self, v: Visitor[T, U], ctx: T):
         return v.visitIndexExpr(self, ctx)
+    
+class InitList(Node):
+    def __init__(self, init_list: List[IntLiteral]):
+        super().__init__("init_list")
+        self.init_list = init_list
+        self.value = [item.value for item in init_list]
+
+    def __getitem__(self, item):
+        return self.init_list[item]
+
+    def __len__(self):
+        return len(self.init_list)
+
+    def accept(self, v: Visitor[T, U], ctx: T) -> None:
+        pass

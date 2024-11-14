@@ -42,10 +42,10 @@ class TACFuncEmitter(TACVisitor):
     """
 
     def __init__(
-        self, entry: FuncLabel, numArgs: int, arrays: Dict[str, VarSymbol], labelManager: LabelManager
+        self, entry: FuncLabel, numArgs: int, arrays: Dict[str, VarSymbol], p_arrays: Dict[int, VarSymbol], labelManager: LabelManager
     ) -> None:
         self.labelManager = labelManager
-        self.func = TACFunc(entry, numArgs, arrays)
+        self.func = TACFunc(entry, numArgs, arrays, p_arrays)
         self.visitLabel(entry)
         self.nextTempId = 0
 
@@ -174,7 +174,7 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         tacGlobalVars = program.globalVars()
         for funcName, astFunc in program.functions().items(): #遍历每个函数?
             # in step9, you need to use real parameter count
-            emitter = TACFuncEmitter(FuncLabel(funcName), len(astFunc.params.children), astFunc.arrays, labelManager)
+            emitter = TACFuncEmitter(FuncLabel(funcName), len(astFunc.params.children), astFunc.arrays, astFunc.p_arrays, labelManager)
             for child in astFunc.params.children:
                 child.accept(self, emitter)
             astFunc.body.accept(self, emitter) #调用不同的visit函数
@@ -213,7 +213,11 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         """
         symbol = ident.getattr("symbol")
         if isinstance(symbol.type, ArrayType):
-            ident.setattr("addr", mv.visitLoadAddress(symbol))
+            if symbol.isGlobal or symbol not in mv.func.p_arrays: #对全局数组或局部数组
+                ident.setattr("addr", mv.visitLoadAddress(symbol))
+            else: #对参数数组
+                ident.setattr("addr", symbol.temp)
+            ident.setattr('val', ident.getattr('addr'))
         elif symbol.isGlobal:
             ident.setattr("val", mv.visitLoadData(symbol))
         else:
@@ -229,8 +233,19 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         new_temp = mv.freshTemp()
         symbol.temp = new_temp
         if decl.init_expr is not NULL:
-            init_temp = decl.init_expr.accept(self, mv)
-            mv.visitAssignment(new_temp, decl.init_expr.getattr("val")) #?
+            if isinstance(decl.init_expr, InitList):
+                addr = mv.visitLoadAddress(symbol)
+                size = symbol.type.full_indexed.size
+                interval = mv.visitLoad(size)
+                mv.visitParam(addr)
+                mv.visitParam(mv.visitLoad(symbol.type.size // size))               
+                mv.visitCall(FuncLabel("fill_array"))
+                for value in decl.init_expr.value:
+                    mv.visitStoreArray(mv.visitLoad(value), addr)
+                    mv.visitBinarySelf(tacop.TacBinaryOp.ADD, addr, interval)
+            else:
+                init_temp = decl.init_expr.accept(self, mv)
+                decl.setattr("val", mv.visitAssignment(new_temp, decl.init_expr.getattr("val")))
             
         # raise NotImplementedError
         

@@ -13,6 +13,7 @@ from frontend.typecheck.typer import Typer
 from utils.printtree import TreePrinter
 from utils.tac.tacprog import TACProg
 
+memsetFunc = "int fill_array(int array[], int cnt){\n    for(int i = 0; i < cnt; i = i + 1) array[i] = 0;\n    return 0;\n}"
 
 def parseArgs():
     parser = argparse.ArgumentParser(description="MiniDecaf compiler")
@@ -30,7 +31,8 @@ def readCode(fileName):
 
 # The parser stage: MiniDecaf code -> Abstract syntax tree
 def step_parse(args: argparse.Namespace):
-    code = readCode(args.input)
+    code = str(memsetFunc) + "\n" + readCode(args.input)
+    # print(code)
     r: Program = parser.parse(code, lexer=lexer)
 
     errors = parser.error_stack

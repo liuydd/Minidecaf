@@ -5,10 +5,11 @@ from .tacinstr import TACInstr
 
 
 class TACFunc:
-    def __init__(self, entry: FuncLabel, numArgs: int, arrays: Dict[str, VarSymbol]) -> None:
+    def __init__(self, entry: FuncLabel, numArgs: int, arrays: Dict[str, VarSymbol], p_arrays: Dict[int, VarSymbol]) -> None:
         self.entry = entry
         self.numArgs = numArgs
         self.arrays = arrays
+        self.p_arrays = p_arrays
         self.instrSeq = []
         self.tempUsed = 0
 
